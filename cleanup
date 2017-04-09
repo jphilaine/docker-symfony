@@ -1,0 +1,68 @@
+#!/bin/bash
+
+set -e
+
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+cd ${DIR}
+
+trap "exit 1" TERM
+export TOP_PID=$$
+
+error() {
+  echo -e "\033[31m$1\033[00m"
+  kill -s TERM $TOP_PID
+}
+
+usage()
+{
+    cat << EOF
+usage: $0 options
+This script setup symfony application
+OPTIONS:
+    --rmi           Remove local docker images
+    -a, --all       Clean all workspace application
+    -h, --help      Show this message
+EOF
+}
+
+while test $# -gt 0
+do
+    case "$1" in
+        --rmi )
+            CLEAN_LOCAL_IMAGES=true
+            ;;
+        -a | --all )
+            CLEAN_WORKSPACE=true
+            ;;
+        -h | --help )
+            usage
+            exit
+            break ;;
+        *)
+            usage
+            error "Unknown parameter $1"
+            ;;
+        esac
+    shift
+done
+
+if [[ -z ${CLEAN_LOCAL_IMAGES} ]]; then
+  #Default value
+  CLEAN_LOCAL_IMAGES=false
+fi
+
+if [[ -z ${CLEAN_WORKSPACE} ]]; then
+  #Default value
+  CLEAN_WORKSPACE=false
+fi
+
+if ${CLEAN_LOCAL_IMAGES}; then
+    docker-compose down --volumes --remove-orphans --rmi local
+else
+    docker-compose down
+fi
+
+if ${CLEAN_WORKSPACE}; then
+  echo Cleaning workspace
+  rm -fr app/ etc/ opt/ src/ var/ web/
+fi

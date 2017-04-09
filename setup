@@ -1,0 +1,85 @@
+#!/bin/bash
+
+set -e
+
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+cd ${DIR}
+
+trap "exit 1" TERM
+export TOP_PID=$$
+
+error() {
+  echo -e "\033[31m$1\033[00m"
+  kill -s TERM $TOP_PID
+}
+
+usage()
+{
+    cat << EOF
+usage: $0 options
+This script setup symfony application
+OPTIONS:
+    -b, --build     Build docker images
+    -h, --help      Show this message
+EOF
+}
+
+while test $# -gt 0
+do
+    case "$1" in
+        -b | --build )
+            BUILD=true
+            ;;
+        -h | --help )
+            usage
+            exit
+            break ;;
+        *)
+            usage
+            error "Unknown parameter $1"
+            ;;
+        esac
+    shift
+done
+
+if [[ -z ${BUILD} ]]; then
+  #Default value
+  BUILD=false
+fi
+
+source ./automation/vars/mysql
+
+# Initialization workspace
+if [ ! -d app ]; then mkdir app; fi
+if [ ! -d etc ]; then mkdir etc; fi
+if [ ! -d opt ]; then mkdir opt; fi
+if [ ! -d src ]; then mkdir src; fi
+if [ ! -d web ]; then mkdir web; fi
+
+# Download symfony core
+if [ ! -d opt/symfony ]; then symfony new opt/symfony; fi
+
+# Expose source code
+if [ ! -f app/AppKernel.php ]; then cp -R opt/symfony/app/AppKernel.php app/AppKernel.php; fi
+if [ ! -d app/config ]; then cp -R opt/symfony/app/config app/config; fi
+if [ ! -d app/Resources ]; then cp -R opt/symfony/app/Resources app/Resources; fi
+if [ ! -f etc/composer.json ]; then cp -R opt/symfony/composer.json etc; fi
+if [ ! -f etc/composer.lock ]; then cp -R opt/symfony/composer.lock etc; fi
+if [ ! -d src/AppBundle ]; then cp -R opt/symfony/src/AppBundle src/AppBundle; fi
+if [ ! -f web/app_dev.php ]; then cp -R opt/symfony/web/app_dev.php web/app_dev.php; fi
+
+# Build docker images
+if ${BUILD}; then
+    docker-compose build
+fi
+
+# Start docker containers
+docker-compose up -d --force-recreate
+
+# Waiting for mysql service ready
+#echo "Waiting for mysql service ready..."
+while ! docker-compose exec builder mysqladmin ping -h"$DB_HOST" -u"DB_USER" -p"DB_PASSWORD" --silent; do
+    sleep 1
+done
+
+docker-compose exec builder /home/admin/automation/bin/install

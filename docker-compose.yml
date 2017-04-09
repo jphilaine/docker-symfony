@@ -1,0 +1,68 @@
+version: '2'
+
+services:
+  application:
+    build: .
+    command: /bin/true
+    volumes:
+      - ./automation:/home/admin/automation/
+      - ./app/AppKernel.php:/home/admin/www/app/AppKernel.php
+      - ./app/config:/home/admin/www/app/config
+      - ./app/Resources:/home/admin/www/app/Resources
+      - ./etc/composer.json:/home/admin/www/composer.json
+      - ./etc/composer.lock:/home/admin/www/composer.lock
+      - ./opt/symfony/vendor:/home/admin/www/vendor
+      - ./src/AppBundle:/home/admin/www/src/AppBundle
+      - ./web/app_dev.php:/home/admin/www/web/app_dev.php
+    labels:
+      - "traefik.enable=false"
+
+  builder:
+    build: automation/docker/builder
+    environment:
+      - SYMFONY_ENV=dev
+      - COMPOSER_CACHE_DIR=/tmp
+    links:
+      - mysql
+    volumes:
+      - ~/.ssh:/home/admin/.ssh
+    volumes_from:
+      - application
+    labels:
+      - "traefik.enable=false"
+
+  engine:
+    build: automation/docker/engine
+    links:
+      - mysql
+    volumes_from:
+      - application
+    labels:
+      - "traefik.enable=false"
+
+  front:
+    build: automation/docker/front
+    links:
+      - engine
+    volumes_from:
+      - application
+    labels:
+      - "traefik.backend=nginx"
+      - "traefik.frontend.rule=Host:symfony.docker.localhost"
+      - "traefik.port=80"
+      - "traefik.frontend.entryPoints=http"
+
+  mysql:
+    image: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: symfony
+    volumes:
+      - ./var/mysql:/var/lib/mysql
+    labels:
+      - "traefik.enable=false"
+
+networks:
+    default:
+        external:
+            name: dockerproxy_default

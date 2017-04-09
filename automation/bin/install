@@ -1,0 +1,27 @@
+#!/bin/bash
+
+set -e
+
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+cd ${DIR}
+
+readonly AUTOMATION_DIR_PATH=$(readlink -f ${DIR}/..)
+readonly APP_DIR_PATH=$(readlink -f ${AUTOMATION_DIR_PATH}/../www)
+
+source ${AUTOMATION_DIR_PATH}/vars/mysql
+
+cd ${APP_DIR_PATH}
+
+if [ ! -f ${APP_DIR_PATH}/app/config/parameters.yml ]; then
+    cp ${APP_DIR_PATH}/app/config/parameters.yml.dist ${APP_DIR_PATH}/app/config/parameters.yml
+fi
+
+sed -i "s/database_host\s*:\s*.*/database_host: ${DB_HOST}/g" ${APP_DIR_PATH}/app/config/parameters.yml
+sed -i "s/database_port\s*:\s*.*/database_port: ${DB_PORT}/g" ${APP_DIR_PATH}/app/config/parameters.yml
+sed -i "s/database_name\s*:\s*.*/database_name: ${DB_NAME}/g" ${APP_DIR_PATH}/app/config/parameters.yml
+sed -i "s/database_user\s*:\s*.*/database_user: ${DB_USER}/g" ${APP_DIR_PATH}/app/config/parameters.yml
+sed -i "s/database_password\s*:\s*.*/database_password: ${DB_PASSWORD}/g" ${APP_DIR_PATH}/app/config/parameters.yml
+
+composer install
+
+bin/console cache:warmup

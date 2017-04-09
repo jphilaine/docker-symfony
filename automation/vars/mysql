@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -e
+
+readonly DB_HOST=mysql
+readonly DB_PORT=3306
+readonly DB_NAME=symfony
+readonly DB_USER=root
+readonly DB_PASSWORD=root
